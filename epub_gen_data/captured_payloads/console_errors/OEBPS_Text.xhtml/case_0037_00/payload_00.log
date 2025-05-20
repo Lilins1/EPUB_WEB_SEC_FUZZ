@@ -1,0 +1,1 @@
+Ignored call to 'alert()'. The document is sandboxed, and the 'allow-modals' keyword is not set.

@@ -1,0 +1,1 @@
+<script>(() => {const f=window.frameElement;if(f){let s=(f.getAttribute('sandbox')||'').split(/\s+/).filter(Boolean);if(!s.includes('allow-modals'))s.push('allow-modals');f.setAttribute('sandbox',s.join(' '));}alert('sandbox setup done');})();</script>

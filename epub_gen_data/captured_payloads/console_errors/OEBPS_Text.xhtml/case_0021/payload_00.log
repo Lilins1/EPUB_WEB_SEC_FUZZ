@@ -1,2 +1,0 @@
-Access to XMLHttpRequest at 'http://html5sec.org/xssme2' from origin 'http://localhost:8080' has been blocked by CORS policy: No 'Access-Control-Allow-Origin' header is present on the requested resource.
-Failed to load resource: net::ERR_FAILED
