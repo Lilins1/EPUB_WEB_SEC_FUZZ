@@ -2,7 +2,7 @@
 <package version="3.0" xmlns="http://www.idpf.org/2007/opf" unique-identifier="uid">
   <metadata xmlns:dc="http://purl.org/dc/elements/1.1/">
     <dc:identifier id="uid">urn:uuid:12345678-1234-1234-1234-123456789012</dc:identifier>
-    <dc:title>TEST_TITLE_PAYLOAD</dc:title>
+    <dc:title><!-- TITLE_PAYLOAD --></dc:title>
     <dc:language>en</dc:language>
   </metadata>
   <manifest>

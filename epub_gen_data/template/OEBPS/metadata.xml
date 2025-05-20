@@ -1,7 +1,8 @@
 <?xml version="1.0"?>
 <metadata xmlns:dc="http://purl.org/dc/elements/1.1/">
-    <dc:title>NORMAL_TITLE</dc:title>
+    <dc:title><!-- METADATA_TITLE --></dc:title>
     <dc:description>
-        <p>DESCRIPTION_PAYLOAD</p>
+        <!-- METADATA_DESC -->
+        <!-- XML_PI_INJECTION -->
     </dc:description>
 </metadata>

